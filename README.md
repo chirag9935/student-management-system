@@ -56,8 +56,7 @@ student-management-system/
 │   │       │   ├── index.html
 │   │       │   └── student-form.html
 │   │       └── application.properties
-├── pom.xml
-└── README.md
+└──  pom.xml
 ```
 
 ## 🧩 Future Enhancements
