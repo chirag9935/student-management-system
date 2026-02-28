@@ -1,0 +1,36 @@
+<!doctype html>
+<!--
+  Custom error page — displayed when GlobalExceptionHandler catches an exception
+  and returns the "error" view name.
+-->
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Error — Student Management System</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}" />
+  </head>
+  <body>
+    <div th:replace="~{fragments/navbar :: navbar}"></div>
+
+    <div class="error-page">
+      <div class="error-card">
+        <div class="error-icon">⚠️</div>
+
+        <!-- errorTitle and errorMessage are set by GlobalExceptionHandler -->
+        <h2
+          th:text="${errorTitle != null} ? ${errorTitle} : 'Something Went Wrong'"
+        >
+          Error
+        </h2>
+        <p
+          th:text="${errorMessage != null} ? ${errorMessage} : 'An unexpected error occurred. Please try again.'"
+        >
+          An unexpected error occurred.
+        </p>
+
+        <a href="/" class="btn btn-primary">← Back to Dashboard</a>
+      </div>
+    </div>
+  </body>
+</html>

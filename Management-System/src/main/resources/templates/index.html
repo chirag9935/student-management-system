@@ -1,39 +1,253 @@
-<!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
-<head>
-    <title>Student Dashboard</title>
-    <link rel="stylesheet" th:href="@{/css/style.css}">
-</head>
-<body>
-<div class="container">
-    <h1>🎓 Student Management Dashboard</h1>
-    <a href="/add" class="btn">➕ Add New Student</a>
+<!doctype html>
+<!--
+  Main dashboard template — shows student list with stats, search, and CRUD actions.
 
-    <table>
-        <thead>
-        <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Email</th>
-            <th>Course</th>
-            <th>Marks</th>
-            <th>Actions</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr th:each="student : ${students}">
-            <td th:text="${student.id}"></td>
-            <td th:text="${student.name}"></td>
-            <td th:text="${student.email}"></td>
-            <td th:text="${student.course}"></td>
-            <td th:text="${student.marks}"></td>
-            <td>
-                <a th:href="@{'/edit/' + ${student.id}}" class="btn small">✏️ Edit</a>
-                <a th:href="@{'/delete/' + ${student.id}}" class="btn small danger">🗑️ Delete</a>
-            </td>
-        </tr>
-        </tbody>
-    </table>
-</div>
-</body>
+  Thymeleaf namespaces:
+    th:  → Thymeleaf standard  (data binding, iteration, conditionals)
+    sec: → Spring Security      (show/hide based on user role)
+-->
+<html
+  xmlns:th="http://www.thymeleaf.org"
+  xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+  lang="en"
+>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard — Student Management System</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}" />
+  </head>
+  <body>
+    <!-- Navbar Fragment: th:replace pulls in the shared navbar -->
+    <div th:replace="~{fragments/navbar :: navbar}"></div>
+
+    <div class="main-content">
+      <!-- ── Flash Messages ──────────────────────────────────────── -->
+      <!--
+      RedirectAttributes.addFlashAttribute() puts values in the flash scope,
+      which Thymeleaf reads as model attributes on the NEXT request.
+    -->
+      <div class="alert alert-success" th:if="${successMessage}">
+        <span th:text="${successMessage}">Success</span>
+      </div>
+      <div class="alert alert-danger" th:if="${errorMessage}">
+        <span th:text="${errorMessage}">Error</span>
+      </div>
+
+      <!-- ── Page Header ─────────────────────────────────────────── -->
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">Student Dashboard</h1>
+          <p class="page-subtitle">Manage and track all enrolled students</p>
+        </div>
+        <a th:href="@{/add}" class="btn btn-primary">➕ Add Student</a>
+      </div>
+
+      <!-- ── Stats Cards ─────────────────────────────────────────── -->
+      <!--
+      These values come from the controller:
+        model.addAttribute("totalStudents", ...)
+        model.addAttribute("averageMarks",  ...)
+        model.addAttribute("topStudent",    ...)
+        model.addAttribute("passingRate",   ...)
+    -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon purple">👥</div>
+          <div class="stat-info">
+            <div class="stat-value" th:text="${totalStudents}">0</div>
+            <div class="stat-label">Total Students</div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon green">📈</div>
+          <div class="stat-info">
+            <div class="stat-value" th:text="${averageMarks} + '%'">0%</div>
+            <div class="stat-label">Average Marks</div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon orange">🏆</div>
+          <div class="stat-info">
+            <!-- th:text shows the top student's name, or "N/A" if none exist -->
+            <div
+              class="stat-value"
+              th:text="${topStudent != null} ? ${topStudent.name} : 'N/A'"
+            >
+              N/A
+            </div>
+            <div class="stat-label">Top Scorer</div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-icon red">✅</div>
+          <div class="stat-info">
+            <div class="stat-value" th:text="${passingRate} + '%'">0%</div>
+            <div class="stat-label">Passing Rate</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Toolbar (Search + Count) ───────────────────────────── -->
+      <div class="toolbar">
+        <!--
+        Search form: submits GET / with ?search=keyword
+        th:action="@{/}" → resolves to the root URL
+      -->
+        <form th:action="@{/}" method="get" class="search-bar">
+          <span class="search-icon">🔍</span>
+          <input
+            type="text"
+            name="search"
+            placeholder="Search by name, email, or course…"
+            th:value="${search}"
+          />
+        </form>
+
+        <!-- Show "Showing X results for …" when search is active -->
+        <span
+          style="color: var(--text-muted); font-size: 13px"
+          th:if="${search != null and !#strings.isEmpty(search)}"
+        >
+          Found <strong th:text="${students.size()}">0</strong> result(s) for
+          "<em th:text="${search}"></em>" —
+          <a th:href="@{/}" style="color: var(--accent)">Clear</a>
+        </span>
+        <span
+          style="color: var(--text-muted); font-size: 13px"
+          th:unless="${search != null and !#strings.isEmpty(search)}"
+        >
+          <strong th:text="${students.size()}">0</strong> students enrolled
+        </span>
+      </div>
+
+      <!-- ── Student Table ───────────────────────────────────────── -->
+      <div class="table-card">
+        <div class="table-wrapper">
+          <!-- Empty state — shown when no students are found -->
+          <div class="empty-state" th:if="${#lists.isEmpty(students)}">
+            <div class="empty-icon">🎓</div>
+            <h3>No students found</h3>
+            <p th:if="${search != null and !#strings.isEmpty(search)}">
+              Try a different search term, or
+              <a th:href="@{/}" style="color: var(--accent)"
+                >view all students</a
+              >.
+            </p>
+            <p th:unless="${search != null and !#strings.isEmpty(search)}">
+              Get started by adding your first student.
+            </p>
+          </div>
+
+          <!-- Table — only shown when there are students -->
+          <table th:unless="${#lists.isEmpty(students)}">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Student</th>
+                <th>Course</th>
+                <th>Marks</th>
+                <th>Grade</th>
+                <th>Phone</th>
+                <th>Enrolled</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!--
+              th:each="student : ${students}" iterates over the students list.
+              th:each also gives you iterStat (index, count, first, last, etc.)
+            -->
+              <tr th:each="student, iterStat : ${students}">
+                <!-- Row number -->
+                <td
+                  style="color: var(--text-muted)"
+                  th:text="${iterStat.count}"
+                >
+                  1
+                </td>
+
+                <!-- Name + Email combined cell -->
+                <td>
+                  <div class="student-name" th:text="${student.name}">Name</div>
+                  <div class="student-email" th:text="${student.email}">
+                    email
+                  </div>
+                </td>
+
+                <td th:text="${student.course}">Course</td>
+
+                <!-- Marks with color coding -->
+                <td>
+                  <strong th:text="${student.marks}">0</strong>
+                  <span style="color: var(--text-muted); font-size: 11px"
+                    >/100</span
+                  >
+                </td>
+
+                <!-- Grade Badge — uses computed getGrade() and getGradeClass() from Student entity -->
+                <td>
+                  <span
+                    class="badge"
+                    th:classappend="${student.gradeClass}"
+                    th:text="${student.grade}"
+                    >A</span
+                  >
+                </td>
+
+                <td
+                  th:text="${student.phone != null and !#strings.isEmpty(student.phone)} ? ${student.phone} : '—'"
+                >
+                  —
+                </td>
+
+                <!-- Format date as Day Month Year -->
+                <td
+                  th:text="${student.enrolledDate != null}
+                    ? ${#temporals.format(student.enrolledDate, 'dd MMM yyyy')}
+                    : '—'"
+                >
+                  —
+                </td>
+
+                <!-- Action buttons -->
+                <td>
+                  <div class="td-actions">
+                    <a
+                      th:href="@{'/edit/' + ${student.id}}"
+                      class="btn btn-warning btn-sm"
+                      >✏️ Edit</a
+                    >
+
+                    <!--
+                    sec:authorize="hasRole('ADMIN')" hides the Delete button from non-admin users.
+                    Admin credential: admin / admin123
+                  -->
+                    <a
+                      sec:authorize="hasRole('ADMIN')"
+                      th:href="@{'/delete/' + ${student.id}}"
+                      class="btn btn-danger btn-sm"
+                      onclick="
+                        return confirm(
+                          'Are you sure you want to delete this student?',
+                        );
+                      "
+                    >
+                      🗑️ Delete
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <!-- /table-wrapper -->
+      </div>
+      <!-- /table-card -->
+    </div>
+    <!-- /main-content -->
+  </body>
 </html>

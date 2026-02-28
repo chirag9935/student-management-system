@@ -1,0 +1,51 @@
+<!doctype html>
+<!--
+  Navbar fragment — a reusable Thymeleaf fragment.
+  Include in other pages with: th:replace="~{fragments/navbar :: navbar}"
+
+  xmlns:sec lets us use Spring Security's sec:authorize to check user roles.
+-->
+<html
+  xmlns:th="http://www.thymeleaf.org"
+  xmlns:sec="http://www.thymeleaf.org/extras/spring-security"
+  lang="en"
+>
+  <body>
+    <nav class="navbar" th:fragment="navbar">
+      <!-- Brand / Logo -->
+      <a href="/" class="navbar-brand">
+        <div class="brand-icon">🎓</div>
+        <span>StudentMS</span>
+      </a>
+
+      <!-- Nav links -->
+      <ul class="navbar-nav">
+        <li><a th:href="@{/}">📊 Dashboard</a></li>
+        <li><a th:href="@{/add}">➕ Add Student</a></li>
+        <!--
+      sec:authorize="hasRole('ADMIN')" — only shown to ADMIN users.
+      This tag comes from thymeleaf-extras-springsecurity6.
+    -->
+        <li sec:authorize="hasRole('ADMIN')">
+          <a th:href="@{/h2-console}" target="_blank">🗄️ H2 Console</a>
+        </li>
+      </ul>
+
+      <!-- User info + Logout -->
+      <div class="navbar-user">
+        <div
+          class="avatar"
+          sec:authentication="name"
+          th:text="${#strings.substring(#authentication.name, 0, 1).toUpperCase()}"
+        >
+          A
+        </div>
+        <span sec:authentication="name">User</span>
+        <!-- Logout uses POST (best practice with CSRF protection) -->
+        <form th:action="@{/logout}" method="post" style="margin: 0">
+          <button type="submit" class="btn-logout">Logout</button>
+        </form>
+      </div>
+    </nav>
+  </body>
+</html>
